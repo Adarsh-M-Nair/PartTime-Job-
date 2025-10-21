@@ -15,7 +15,7 @@ const generateToken = (id) => {
 // @desc    Register a new user
 // @access  Public
 router.post('/register', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, userType, name } = req.body;
 
     if (!email || !password) {
         return res.status(400).json({ message: 'Please enter all fields' });
@@ -27,25 +27,56 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'User already exists' });
         }
 
+        // Determine role based on userType
+        const role = userType === 'employer' ? 'Employer' : 'Student';
+
         user = await User.create({
             email,
             password,
-            role: 'NewUser',
+            role: role,
             isProfileComplete: false,
         });
 
         if (user) {
+            // Create appropriate profile based on user type
+            if (role === 'Student') {
+                const StudentProfile = require('../models/StudentProfile');
+                // Split name into first and last name
+                const nameParts = (name || 'Student').split(' ');
+                const firstName = nameParts[0] || 'Student';
+                const lastName = nameParts.slice(1).join(' ') || 'User';
+                
+                await StudentProfile.create({
+                    user_id: user._id,
+                    first_name: firstName,
+                    last_name: lastName,
+                    university: '',
+                    major: '',
+                    year_of_study: 1,
+                });
+            } else if (role === 'Employer') {
+                const EmployerProfile = require('../models/EmployerProfile');
+                await EmployerProfile.create({
+                    user_id: user._id,
+                    company_name: name || 'Company',
+                    contact_name: name || 'Contact',
+                    phone: '',
+                    city: 'Not specified',
+                });
+            }
+
             res.status(201).json({
                 _id: user._id,
                 email: user.email,
                 role: user.role,
+                isProfileComplete: user.isProfileComplete,
                 token: generateToken(user._id),
             });
         } else {
             res.status(400).json({ message: 'Invalid user data' });
         }
     } catch (error) {
-        console.error(error);
+        console.error('Registration error:', error);
         res.status(500).json({ message: 'Server error during registration' });
     }
 });
