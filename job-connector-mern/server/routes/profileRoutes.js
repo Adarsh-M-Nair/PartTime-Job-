@@ -73,51 +73,115 @@ router.get('/employer', protect, checkRole('Employer'), async (req, res) => {
 
 // --- APPLICATION ENDPOINTS ---
 
-// @route   POST /api/jobs/apply
+// @route   POST /api/profiles/apply
 // @desc    Submit a job application
 // @access  Private (Role: Student)
 router.post('/apply', protect, checkRole('Student'), async (req, res) => {
     const { job_id, cover_letter } = req.body;
     const studentProfileId = req.user.profileId;
 
+    console.log('Application attempt:', { 
+        userId: req.user._id, 
+        userRole: req.user.role, 
+        profileId: studentProfileId,
+        jobId: job_id 
+    });
+
     if (!studentProfileId) {
-        return res.status(400).json({ message: 'Student profile ID missing for authenticated user.' });
+        // Try to create a basic student profile if it doesn't exist
+        try {
+            console.log('Creating missing student profile for user:', req.user._id);
+            const StudentProfile = require('../models/StudentProfile');
+            const newProfile = await StudentProfile.create({
+                user_id: req.user._id,
+                first_name: 'Student',
+                last_name: 'User',
+                university: '',
+                major: '',
+                year_of_study: 1,
+            });
+            req.user.profileId = newProfile._id;
+            console.log('Created student profile:', newProfile._id);
+        } catch (profileError) {
+            console.error('Error creating student profile:', profileError);
+            return res.status(400).json({ 
+                message: 'Student profile not found and could not be created automatically.',
+                details: 'Please contact support or try logging out and back in.'
+            });
+        }
     }
 
     try {
+        console.log('Creating application with:', {
+            job_id,
+            student_profile_id: req.user.profileId,
+            cover_letter: cover_letter ? 'Present' : 'Missing'
+        });
+        
         const application = await Application.create({
             job_id,
-            student_profile_id: studentProfileId,
+            student_profile_id: req.user.profileId,
             cover_letter
         });
+        
+        console.log('Application created successfully:', application._id);
         res.status(201).json(application);
     } catch (error) {
-        console.error(error);
+        console.error('Error creating application:', error);
         if (error.code === 11000) {
             return res.status(400).json({ message: 'You have already applied to this job.' });
         }
-        res.status(500).json({ message: 'Server error submitting application.' });
+        res.status(500).json({ 
+            message: 'Server error submitting application.',
+            error: error.message 
+        });
     }
 });
 
-// @route   GET /api/jobs/applications/me
+// @route   GET /api/profiles/applications/me
 // @desc    Get applications submitted by the logged-in Student
 // @access  Private (Role: Student)
 router.get('/applications/me', protect, checkRole('Student'), async (req, res) => {
     const studentProfileId = req.user.profileId;
 
     if (!studentProfileId) {
-        return res.status(400).json({ message: 'Student profile ID missing for authenticated user.' });
+        // Try to create a basic student profile if it doesn't exist
+        try {
+            console.log('Creating missing student profile for user:', req.user._id);
+            const StudentProfile = require('../models/StudentProfile');
+            const newProfile = await StudentProfile.create({
+                user_id: req.user._id,
+                first_name: 'Student',
+                last_name: 'User',
+                university: '',
+                major: '',
+                year_of_study: 1,
+            });
+            req.user.profileId = newProfile._id;
+            console.log('Created student profile:', newProfile._id);
+        } catch (profileError) {
+            console.error('Error creating student profile:', profileError);
+            return res.status(400).json({ 
+                message: 'Student profile not found and could not be created automatically.',
+                details: 'Please contact support or try logging out and back in.'
+            });
+        }
     }
 
     try {
-        const applications = await Application.find({ student_profile_id: studentProfileId })
+        console.log('Fetching applications for profile:', req.user.profileId);
+        
+        const applications = await Application.find({ student_profile_id: req.user.profileId })
             .populate('job_id', 'title company_name location_details'); // Pull job info
         
+        console.log('Found applications:', applications.length);
         res.json(applications);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error fetching applications.' });
+        console.error('Error fetching applications:', error);
+        res.status(500).json({ 
+            message: 'Server error fetching applications.',
+            error: error.message 
+        });
     }
 });
 

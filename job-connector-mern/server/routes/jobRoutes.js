@@ -4,6 +4,7 @@ const { protect } = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const StudentProfile = require('../models/StudentProfile');
 const EmployerProfile = require('../models/EmployerProfile');
+const JobPosting = require('../models/JobPosting');
 
 // @route   POST /api/profiles/student
 // @desc    Create Student Profile and update user role
@@ -107,5 +108,118 @@ router.get('/me', protect, async (req, res) => {
     }
 });
 
+
+// --- JOB POSTING ENDPOINTS ---
+
+// @route   GET /api/jobs
+// @desc    Get all active job postings
+// @access  Public
+router.get('/', async (req, res) => {
+    try {
+        console.log('Fetching all jobs...');
+        const jobs = await JobPosting.find({ is_active: true })
+            .populate('employer_profile_id', 'company_name contact_name')
+            .sort({ createdAt: -1 });
+        
+        console.log('Found jobs:', jobs.length);
+        res.json(jobs);
+    } catch (error) {
+        console.error('Error fetching jobs:', error);
+        res.status(500).json({ 
+            message: 'Server error fetching jobs.',
+            error: error.message 
+        });
+    }
+});
+
+// @route   GET /api/jobs/:id
+// @desc    Get a specific job posting
+// @access  Public
+router.get('/:id', async (req, res) => {
+    try {
+        const job = await JobPosting.findById(req.params.id)
+            .populate('employer_profile_id', 'company_name contact_name phone city');
+        
+        if (!job) {
+            return res.status(404).json({ message: 'Job not found.' });
+        }
+        
+        res.json(job);
+    } catch (error) {
+        console.error('Error fetching job:', error);
+        res.status(500).json({ message: 'Server error fetching job.' });
+    }
+});
+
+// @route   POST /api/jobs
+// @desc    Create a new job posting
+// @access  Private (Role: Employer)
+router.post('/', protect, async (req, res) => {
+    const { title, description, hourly_rate, estimated_hours, location_details, category_id } = req.body;
+    let employerProfileId = req.user.profileId;
+
+    console.log('Job creation attempt:', { 
+        userId: req.user._id, 
+        userRole: req.user.role, 
+        profileId: employerProfileId,
+        title: title 
+    });
+
+    if (!employerProfileId) {
+        // Try to create a basic employer profile if it doesn't exist
+        try {
+            console.log('Creating missing employer profile for user:', req.user._id);
+            const newProfile = await EmployerProfile.create({
+                user_id: req.user._id,
+                company_name: 'Your Company',
+                contact_name: 'Contact Person',
+                phone: '',
+                city: 'Not specified',
+            });
+            employerProfileId = newProfile._id;
+            req.user.profileId = newProfile._id;
+            console.log('Created employer profile:', newProfile._id);
+        } catch (profileError) {
+            console.error('Error creating employer profile:', profileError);
+            return res.status(400).json({ 
+                message: 'Employer profile not found and could not be created automatically.',
+                details: 'Please contact support or try logging out and back in.'
+            });
+        }
+    }
+
+    try {
+        console.log('Creating job with:', {
+            employer_profile_id: employerProfileId,
+            company_name: req.body.company_name || 'Company',
+            category_id,
+            title,
+            description: description ? 'Present' : 'Missing',
+            hourly_rate,
+            estimated_hours,
+            location_details
+        });
+        
+        const job = await JobPosting.create({
+            employer_profile_id: employerProfileId,
+            company_name: req.body.company_name || 'Company',
+            category_id,
+            title,
+            description,
+            hourly_rate,
+            estimated_hours,
+            location_details
+        });
+
+        console.log('Job created successfully:', job._id);
+        res.status(201).json(job);
+    } catch (error) {
+        console.error('Error creating job:', error);
+        res.status(500).json({ 
+            message: 'Server error creating job.',
+            error: error.message 
+        });
+    }
+});
 
 module.exports = router;

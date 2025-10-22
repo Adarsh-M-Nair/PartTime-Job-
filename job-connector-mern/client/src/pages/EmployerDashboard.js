@@ -2,12 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PlusCircle } from 'lucide-react';
 import PostJobModal from '../components/PostJobModal';
 import ViewApplicationsModal from '../components/ViewApplicationsModal';
-
-// Mock Data (replace with API calls)
-const mockEmployerJobs = [
-    { id: 'job5', title: 'Barista for Morning Shifts', employerName: 'The Local Cafe', location: '123 Main St', category: 'Food Service', payRate: '$17/hour', applicationCount: 12 },
-    { id: 'job6', title: 'Flyer Distributor', employerName: 'The Local Cafe', location: 'Campus-wide', category: 'Marketing', payRate: '$15/hour', applicationCount: 34 }
-];
+import { jobService } from '../services/jobService';
 
 const EmployerDashboard = () => {
     const [jobs, setJobs] = useState([]);
@@ -17,13 +12,51 @@ const EmployerDashboard = () => {
     const [selectedJobForApps, setSelectedJobForApps] = useState(null);
 
     useEffect(() => {
-        // TODO: API Call to fetch jobs for this employer
-        setLoading(true);
-        setTimeout(() => { // Simulate network delay
-            setJobs(mockEmployerJobs);
-            setLoading(false);
-        }, 1000);
+        loadJobs();
     }, []);
+
+    const loadJobs = async () => {
+        setLoading(true);
+        try {
+            const jobsData = await jobService.getJobs();
+            // Transform backend data to frontend format
+            const transformedJobs = jobsData.map(job => ({
+                id: job._id,
+                title: job.title,
+                employerName: job.company_name,
+                location: job.location_details,
+                category: getCategoryName(job.category_id),
+                payRate: `$${job.hourly_rate}/hour`,
+                applicationCount: 0 // TODO: Get real application count
+            }));
+            setJobs(transformedJobs);
+        } catch (error) {
+            console.error('Error loading jobs:', error);
+            // Fallback to mock data if API fails
+            setJobs([
+                { id: 'job5', title: 'Barista for Morning Shifts', employerName: 'The Local Cafe', location: '123 Main St', category: 'Food Service', payRate: '$17/hour', applicationCount: 12 },
+                { id: 'job6', title: 'Flyer Distributor', employerName: 'The Local Cafe', location: 'Campus-wide', category: 'Marketing', payRate: '$15/hour', applicationCount: 34 }
+            ]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getCategoryName = (categoryId) => {
+        const categories = {
+            1: 'Catering',
+            2: 'Delivery', 
+            3: 'Tutoring',
+            4: 'Retail',
+            5: 'Other'
+        };
+        return categories[categoryId] || 'Other';
+    };
+
+    const handleJobPosted = () => {
+        // Reload jobs after posting
+        loadJobs();
+    };
 
     const handleViewApplications = (job) => {
         setSelectedJobForApps(job);
@@ -66,7 +99,7 @@ const EmployerDashboard = () => {
                 )}
             </div>
 
-            {isPostModalOpen && <PostJobModal onClose={() => setIsPostModalOpen(false)} />}
+            {isPostModalOpen && <PostJobModal onClose={() => setIsPostModalOpen(false)} onJobPosted={handleJobPosted} />}
             {isApplicationsModalOpen && <ViewApplicationsModal job={selectedJobForApps} onClose={() => setIsApplicationsModalOpen(false)} />}
 
         </div>

@@ -3,14 +3,7 @@ import { FileText, ArrowLeft, Search, ChevronDown } from 'lucide-react';
 import JobCard from '../components/JobCard';
 import JobDetailsModal from '../components/JobDetailsModal';
 import MyApplications from '../components/MyApplications';
-
-// Mock Data (replace with API calls)
-const mockJobs = [
-    { id: 'job1', title: 'Catering Assistant for Weekend Event', employerName: 'Gourmet Gatherings', location: 'Campus Center', category: 'Catering', payRate: '$18/hour', description: 'Assist with food prep, setup, and service for a large on-campus event. Must be able to lift 25 lbs. Great for someone with a positive attitude!', postedAt: new Date(2025, 9, 28) },
-    { id: 'job2', title: 'Evening Delivery Driver', employerName: 'Pizza Palace', location: 'Downtown', category: 'Delivery', payRate: '$15/hour + tips', description: 'Deliver pizzas and other food items in the downtown area. Must have a valid driver\'s license and a reliable vehicle. Shifts are from 5 PM to 11 PM.', postedAt: new Date(2025, 9, 27) },
-    { id: 'job3', title: 'Math & Physics Tutor', employerName: 'Academic Success Center', location: 'Library, 2nd Floor', category: 'Tutoring', payRate: '$20/hour', description: 'Tutor undergraduate students in introductory calculus and physics courses. Must have completed these courses with an A grade. Flexible hours.', postedAt: new Date(2025, 9, 26) },
-    { id: 'job4', title: 'Retail Associate', employerName: 'College Bookstore', location: 'Student Union', category: 'Retail', payRate: '$16.50/hour', description: 'Assist customers, manage inventory, and operate the cash register. Friendly and helpful personality required.', postedAt: new Date(2025, 9, 25) },
-];
+import { jobService } from '../services/jobService';
 
 const StudentDashboard = () => {
     const [jobs, setJobs] = useState([]);
@@ -19,13 +12,48 @@ const StudentDashboard = () => {
     const [view, setView] = useState('jobs'); // 'jobs' or 'applications'
 
     useEffect(() => {
-        // TODO: API Call to fetch jobs
-        setLoading(true);
-        setTimeout(() => { // Simulate network delay
-            setJobs(mockJobs);
-            setLoading(false);
-        }, 1000);
+        loadJobs();
     }, []);
+
+    const loadJobs = async () => {
+        setLoading(true);
+        try {
+            const jobsData = await jobService.getJobs();
+            // Transform backend data to frontend format
+            const transformedJobs = jobsData.map(job => ({
+                id: job._id,
+                title: job.title,
+                employerName: job.company_name,
+                location: job.location_details,
+                category: getCategoryName(job.category_id),
+                payRate: `$${job.hourly_rate}/hour`,
+                description: job.description,
+                postedAt: new Date(job.createdAt)
+            }));
+            setJobs(transformedJobs);
+        } catch (error) {
+            console.error('Error loading jobs:', error);
+            // Fallback to mock data if API fails
+            setJobs([
+                { id: 'job1', title: 'Catering Assistant for Weekend Event', employerName: 'Gourmet Gatherings', location: 'Campus Center', category: 'Catering', payRate: '$18/hour', description: 'Assist with food prep, setup, and service for a large on-campus event. Must be able to lift 25 lbs. Great for someone with a positive attitude!', postedAt: new Date(2025, 9, 28) },
+                { id: 'job2', title: 'Evening Delivery Driver', employerName: 'Pizza Palace', location: 'Downtown', category: 'Delivery', payRate: '$15/hour + tips', description: 'Deliver pizzas and other food items in the downtown area. Must have a valid driver\'s license and a reliable vehicle. Shifts are from 5 PM to 11 PM.', postedAt: new Date(2025, 9, 27) },
+                { id: 'job3', title: 'Math & Physics Tutor', employerName: 'Academic Success Center', location: 'Library, 2nd Floor', category: 'Tutoring', payRate: '$20/hour', description: 'Tutor undergraduate students in introductory calculus and physics courses. Must have completed these courses with an A grade. Flexible hours.', postedAt: new Date(2025, 9, 26) },
+                { id: 'job4', title: 'Retail Associate', employerName: 'College Bookstore', location: 'Student Union', category: 'Retail', payRate: '$16.50/hour', description: 'Assist customers, manage inventory, and operate the cash register. Friendly and helpful personality required.', postedAt: new Date(2025, 9, 25) },
+            ]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const getCategoryName = (categoryId) => {
+        const categories = {
+            1: 'Catering',
+            2: 'Delivery', 
+            3: 'Tutoring',
+            4: 'Retail'
+        };
+        return categories[categoryId] || 'Other';
+    };
 
     const MainContent = () => {
         if (loading) {
