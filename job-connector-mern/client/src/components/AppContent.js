@@ -10,12 +10,14 @@ const AppContent = () => {
     if (!user) {
         return <AuthPage />;
     }
-    if (user.type === 'student') {
+    if (user.role === 'Student') {
         return <StudentDashboard />;
     }
-    if (user.type === 'employer') {
+    if (user.role === 'Employer') {
         return <EmployerDashboard />;
     }
+    
+    return <div>Unknown user type: {user.role}</div>;
 };
 
 export default AppContent;
