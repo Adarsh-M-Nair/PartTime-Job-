@@ -19,6 +19,12 @@ export const jobService = {
     return response.data;
   },
 
+  // Get jobs owned by the logged-in employer
+  getEmployerJobs: async () => {
+    const response = await api.get('/profiles/employer');
+    return response.data;
+  },
+
   // Update a job posting (Employer only)
   updateJob: async (jobId, jobData) => {
     const response = await api.put(`/jobs/${jobId}`, jobData);

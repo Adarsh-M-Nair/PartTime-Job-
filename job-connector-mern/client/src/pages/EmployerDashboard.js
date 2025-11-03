@@ -18,7 +18,8 @@ const EmployerDashboard = () => {
     const loadJobs = async () => {
         setLoading(true);
         try {
-            const jobsData = await jobService.getJobs();
+            // Only fetch jobs for the logged-in employer
+            const jobsData = await jobService.getEmployerJobs();
             // Transform backend data to frontend format
             const transformedJobs = jobsData.map(job => ({
                 id: job._id,
@@ -27,7 +28,7 @@ const EmployerDashboard = () => {
                 location: job.location_details,
                 category: getCategoryName(job.category_id),
                 payRate: `$${job.hourly_rate}/hour`,
-                applicationCount: 0 // TODO: Get real application count
+                applicationCount: job.applicationCount || 0
             }));
             setJobs(transformedJobs);
         } catch (error) {

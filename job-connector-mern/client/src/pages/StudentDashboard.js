@@ -10,6 +10,8 @@ const StudentDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [selectedJob, setSelectedJob] = useState(null);
     const [view, setView] = useState('jobs'); // 'jobs' or 'applications'
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All Categories');
 
     useEffect(() => {
         loadJobs();
@@ -61,9 +63,16 @@ const StudentDashboard = () => {
         }
 
         if (view === 'jobs') {
+            const normalizedQuery = searchQuery.trim().toLowerCase();
+            const filteredJobs = jobs.filter(job => {
+                const matchesCategory = selectedCategory === 'All Categories' || job.category === selectedCategory;
+                if (!normalizedQuery) return matchesCategory;
+                const haystack = `${job.title} ${job.employerName} ${job.location} ${job.category}`.toLowerCase();
+                return matchesCategory && haystack.includes(normalizedQuery);
+            });
             return (
                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {jobs.map(job => <JobCard key={job.id} job={job} onSelect={() => setSelectedJob(job)} />)}
+                    {filteredJobs.map(job => <JobCard key={job.id} job={job} onSelect={() => setSelectedJob(job)} />)}
                 </div>
             );
         }
@@ -97,16 +106,26 @@ const StudentDashboard = () => {
             {view === 'jobs' && (
                 <div className="mb-8 flex flex-col md:flex-row gap-4">
                     <div className="relative flex-grow">
-                        <input type="text" placeholder="Search for jobs (e.g., 'Catering')" className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" />
+                        <input
+                            type="text"
+                            placeholder="Search for jobs (e.g., 'Catering')"
+                            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     </div>
                      <div className="relative">
-                        <select className="w-full md:w-48 appearance-none bg-white pl-4 pr-10 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                           <option>All Categories</option>
-                           <option>Catering</option>
-                           <option>Delivery</option>
-                           <option>Tutoring</option>
-                           <option>Retail</option>
+                        <select
+                            className="w-full md:w-48 appearance-none bg-white pl-4 pr-10 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                            value={selectedCategory}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                        >
+                            <option>All Categories</option>
+                            <option>Catering</option>
+                            <option>Delivery</option>
+                            <option>Tutoring</option>
+                            <option>Retail</option>
                         </select>
                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
                     </div>

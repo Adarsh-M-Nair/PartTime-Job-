@@ -1,22 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Modal from './Modal';
+import { applicationService } from '../services/applicationService';
 
 const ViewApplicationsModal = ({ job, onClose }) => {
-    // TODO: Fetch applications for the given job ID
-    const applications = [
-        { studentName: 'Charlie Brown', studentEmail: 'charlie@email.com', coverLetter: 'I am very enthusiastic and a hard worker!', appliedAt: new Date() },
-        { studentName: 'Lucy van Pelt', studentEmail: 'lucy@email.com', coverLetter: 'I have extensive experience and would be a perfect fit.', appliedAt: new Date() }
-    ];
+    const [applications, setApplications] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            setLoading(true);
+            try {
+                const apps = await applicationService.getJobApplications(job.id);
+                setApplications(apps);
+            } catch (e) {
+                console.error('Failed to load applications', e);
+                setApplications([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+        if (job?.id) load();
+    }, [job]);
 
     return (
          <Modal isOpen={true} onClose={onClose}>
             <h2 className="text-2xl font-bold">Applications for {job.title}</h2>
             <div className="mt-4 -mx-6 px-6 border-t border-b border-gray-200 max-h-[60vh] overflow-y-auto">
-                 {applications.length > 0 ? applications.map((app, index) => (
-                    <div key={index} className="py-4 border-b last:border-b-0">
-                        <p className="font-semibold text-gray-800">{app.studentName}</p>
-                        <p className="text-sm text-indigo-600 hover:underline cursor-pointer">{app.studentEmail}</p>
-                        <p className="mt-2 text-gray-600 text-sm leading-relaxed">{app.coverLetter}</p>
+                 {loading ? (
+                    <p className="text-center py-8 text-gray-500">Loading...</p>
+                 ) : applications.length > 0 ? applications.map((app) => (
+                    <div key={app._id} className="py-4 border-b last:border-b-0">
+                        <p className="font-semibold text-gray-800">
+                            {app.student_profile_id?.first_name} {app.student_profile_id?.last_name}
+                        </p>
+                        {app.student_profile_id?.university && (
+                            <p className="text-sm text-gray-500">{app.student_profile_id.university}</p>
+                        )}
+                        <p className="mt-2 text-gray-600 text-sm leading-relaxed">{app.cover_letter || 'No cover letter provided.'}</p>
+                        <p className="text-xs text-gray-400 mt-1">Applied on {new Date(app.createdAt).toLocaleDateString()}</p>
                     </div>
                  )) : <p className="text-center py-8 text-gray-500">No applications for this job yet.</p>}
             </div>

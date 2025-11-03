@@ -120,9 +120,19 @@ router.get('/', async (req, res) => {
         const jobs = await JobPosting.find({ is_active: true })
             .populate('employer_profile_id', 'company_name contact_name')
             .sort({ createdAt: -1 });
+
+        // Ensure company_name is taken from the employer profile when available
+        const normalized = jobs.map(doc => {
+            const job = doc.toObject();
+            const populatedName = job.employer_profile_id?.company_name;
+            if (populatedName && populatedName !== job.company_name) {
+                job.company_name = populatedName;
+            }
+            return job;
+        });
         
         console.log('Found jobs:', jobs.length);
-        res.json(jobs);
+        res.json(normalized);
     } catch (error) {
         console.error('Error fetching jobs:', error);
         res.status(500).json({ 
@@ -189,9 +199,13 @@ router.post('/', protect, async (req, res) => {
     }
 
     try {
+        // Always denormalize from the employer's registered profile
+        const employerProfile = await EmployerProfile.findById(employerProfileId);
+        const companyName = employerProfile?.company_name || 'Company';
+
         console.log('Creating job with:', {
             employer_profile_id: employerProfileId,
-            company_name: req.body.company_name || 'Company',
+            company_name: companyName,
             category_id,
             title,
             description: description ? 'Present' : 'Missing',
@@ -202,7 +216,7 @@ router.post('/', protect, async (req, res) => {
         
         const job = await JobPosting.create({
             employer_profile_id: employerProfileId,
-            company_name: req.body.company_name || 'Company',
+            company_name: companyName,
             category_id,
             title,
             description,

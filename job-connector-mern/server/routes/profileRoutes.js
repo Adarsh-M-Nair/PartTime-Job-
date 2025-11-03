@@ -63,7 +63,24 @@ router.get('/employer', protect, checkRole('Employer'), async (req, res) => {
     
     try {
         const jobs = await JobPosting.find({ employer_profile_id: employerProfileId }).sort({ createdAt: -1 });
-        res.json(jobs);
+
+        // Attach application counts (supports both ObjectId and legacy string job_id)
+        const jobsWithCounts = await Promise.all(jobs.map(async (job) => {
+            try {
+                const objectIdCount = await Application.countDocuments({ job_id: job._id });
+                const stringIdCount = await Application.countDocuments({ job_id: job._id.toString() });
+                const total = objectIdCount + stringIdCount;
+                const obj = job.toObject();
+                obj.applicationCount = total;
+                return obj;
+            } catch (_) {
+                const obj = job.toObject();
+                obj.applicationCount = 0;
+                return obj;
+            }
+        }));
+
+        res.json(jobsWithCounts);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error fetching employer jobs.' });
@@ -171,8 +188,42 @@ router.get('/applications/me', protect, checkRole('Student'), async (req, res) =
     try {
         console.log('Fetching applications for profile:', req.user.profileId);
         
-        const applications = await Application.find({ student_profile_id: req.user.profileId })
-            .populate('job_id', 'title company_name location_details'); // Pull job info
+        // Populate job and its employer profile to ensure correct company_name
+        let applications = await Application.find({ student_profile_id: req.user.profileId })
+            .populate({
+                path: 'job_id',
+                select: 'title company_name location_details employer_profile_id',
+                populate: { path: 'employer_profile_id', select: 'company_name' }
+            });
+
+        // If any application still lacks populated job data (legacy string IDs), backfill on the fly
+        const needsBackfill = applications.some(a => !a.job_id || !a.job_id.title);
+        if (needsBackfill) {
+            const JobPosting = require('../models/JobPosting');
+            const withJobs = await Promise.all(applications.map(async (a) => {
+                if (a.job_id && a.job_id.title) return a; // already populated
+                try {
+                    const job = await JobPosting.findById(a.job_id);
+                    if (job) {
+                        const obj = a.toObject();
+                        obj.job_id = { _id: job._id, title: job.title, company_name: job.company_name, location_details: job.location_details };
+                        return obj;
+                    }
+                } catch (_) {}
+                return a;
+            }));
+            applications = withJobs;
+        }
+
+        // Normalize company_name from employer profile when available
+        applications = applications.map(a => {
+            const obj = typeof a.toObject === 'function' ? a.toObject() : a;
+            const job = obj.job_id;
+            if (job && job.employer_profile_id && job.employer_profile_id.company_name) {
+                job.company_name = job.employer_profile_id.company_name;
+            }
+            return obj;
+        });
         
         console.log('Found applications:', applications.length);
         res.json(applications);
@@ -200,7 +251,12 @@ router.get('/applications/:jobId', protect, checkRole('Employer'), async (req, r
         }
 
         // 2. Fetch applications for the job and populate student details
-        const applications = await Application.find({ job_id: jobId })
+        const applications = await Application.find({
+                $or: [
+                    { job_id: jobId },                 // legacy string match
+                    { job_id: job._id }                // ObjectId match
+                ]
+            })
             .populate('student_profile_id', 'first_name last_name university major year_of_study'); 
         
         res.json(applications);

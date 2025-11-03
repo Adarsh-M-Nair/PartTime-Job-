@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 
 const ApplicationSchema = mongoose.Schema({
     job_id: { 
-        type: String, 
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'JobPosting',
         required: true 
     },
     student_profile_id: { 

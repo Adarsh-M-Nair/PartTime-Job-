@@ -57,8 +57,7 @@ const PostJobModal = ({ onClose, onJobPosted }) => {
                 hourly_rate: hourlyRate,
                 estimated_hours: 8, // Default value
                 location_details: formData.location,
-                category_id: categoryId,
-                company_name: 'Your Company' // This should come from employer profile
+                category_id: categoryId
             };
             
             await jobService.createJob(jobData);
