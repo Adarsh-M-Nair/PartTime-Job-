@@ -101,7 +101,13 @@ const EmployerDashboard = () => {
             </div>
 
             {isPostModalOpen && <PostJobModal onClose={() => setIsPostModalOpen(false)} onJobPosted={handleJobPosted} />}
-            {isApplicationsModalOpen && <ViewApplicationsModal job={selectedJobForApps} onClose={() => setIsApplicationsModalOpen(false)} />}
+            {isApplicationsModalOpen && (
+                <ViewApplicationsModal 
+                    job={selectedJobForApps} 
+                    onClose={() => setIsApplicationsModalOpen(false)}
+                    onApplicationUpdated={loadJobs}
+                />
+            )}
 
         </div>
     );

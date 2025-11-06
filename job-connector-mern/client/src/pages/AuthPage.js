@@ -50,15 +50,21 @@ const AuthPage = () => {
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {!isLogin && (
                         <div>
-                            <label htmlFor="name" className="block text-sm font-medium text-gray-700">Full Name / Company Name</label>
+                            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                                {userType === 'student' ? 'Full Name' : 'Company Name'}
+                            </label>
                             <input 
                                 type="text" 
                                 id="name" 
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
+                                placeholder={userType === 'student' ? 'Enter your full name' : 'Enter your company name'}
                                 required 
                                 className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" 
                             />
+                            <p className="mt-1 text-xs text-gray-500">
+                                {userType === 'student' ? 'This will be displayed on your profile and applications' : 'This will be displayed as your company name'}
+                            </p>
                         </div>
                     )}
                     <div>

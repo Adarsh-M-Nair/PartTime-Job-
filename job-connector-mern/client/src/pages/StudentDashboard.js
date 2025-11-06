@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, ArrowLeft, Search, ChevronDown } from 'lucide-react';
+import { FileText, ArrowLeft, Search, ChevronDown, User } from 'lucide-react';
 import JobCard from '../components/JobCard';
 import JobDetailsModal from '../components/JobDetailsModal';
 import MyApplications from '../components/MyApplications';
 import { jobService } from '../services/jobService';
+import { useAuth } from '../context/AuthContext';
 
 const StudentDashboard = () => {
+    const { user } = useAuth();
     const [jobs, setJobs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedJob, setSelectedJob] = useState(null);
@@ -84,8 +86,25 @@ const StudentDashboard = () => {
 
     return (
         <div>
+            {/* Welcome Section with User Name */}
+            <div className="mb-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg p-6 text-white shadow-lg">
+                <div className="flex items-center gap-3">
+                    <div className="bg-white/20 p-3 rounded-full">
+                        <User className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-bold">
+                            Welcome, {user?.name || 'Student'}!
+                        </h1>
+                        <p className="text-indigo-100 text-sm mt-1">
+                            {view === 'jobs' ? 'Browse available job opportunities' : 'Track your job applications'}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-                <h2 className="text-3xl font-bold">
+                <h2 className="text-3xl font-bold text-gray-800">
                     {view === 'jobs' ? 'Available Jobs' : 'My Applications'}
                 </h2>
                  <div className="flex items-center gap-2 w-full md:w-auto">

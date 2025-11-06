@@ -64,16 +64,21 @@ router.get('/employer', protect, checkRole('Employer'), async (req, res) => {
     try {
         const jobs = await JobPosting.find({ employer_profile_id: employerProfileId }).sort({ createdAt: -1 });
 
-        // Attach application counts (supports both ObjectId and legacy string job_id)
+        // Attach application counts (use $or to match both ObjectId and string, but avoid duplicates)
         const jobsWithCounts = await Promise.all(jobs.map(async (job) => {
             try {
-                const objectIdCount = await Application.countDocuments({ job_id: job._id });
-                const stringIdCount = await Application.countDocuments({ job_id: job._id.toString() });
-                const total = objectIdCount + stringIdCount;
+                // Count applications matching either ObjectId or string format, but use distinct to avoid duplicates
+                const count = await Application.countDocuments({
+                    $or: [
+                        { job_id: job._id },
+                        { job_id: job._id.toString() }
+                    ]
+                });
                 const obj = job.toObject();
-                obj.applicationCount = total;
+                obj.applicationCount = count;
                 return obj;
-            } catch (_) {
+            } catch (error) {
+                console.error('Error counting applications for job:', job._id, error);
                 const obj = job.toObject();
                 obj.applicationCount = 0;
                 return obj;
@@ -251,13 +256,78 @@ router.get('/applications/:jobId', protect, checkRole('Employer'), async (req, r
         }
 
         // 2. Fetch applications for the job and populate student details
-        const applications = await Application.find({
+        let applications = await Application.find({
                 $or: [
                     { job_id: jobId },                 // legacy string match
                     { job_id: job._id }                // ObjectId match
                 ]
             })
-            .populate('student_profile_id', 'first_name last_name university major year_of_study'); 
+            .populate({
+                path: 'student_profile_id',
+                select: 'first_name last_name university major year_of_study'
+            }); 
+        
+        // Ensure student names are never empty - provide defaults if missing
+        const StudentProfile = require('../models/StudentProfile');
+        applications = await Promise.all(applications.map(async (app) => {
+            const obj = app.toObject ? app.toObject() : app;
+            
+            // Check if student_profile_id was populated successfully
+            let studentProfile = obj.student_profile_id;
+            
+            // If populate failed (returns null or ObjectId string), fetch manually
+            if (!studentProfile || typeof studentProfile === 'string') {
+                // Get the profile ID from the original document
+                const profileId = typeof studentProfile === 'string' 
+                    ? studentProfile 
+                    : (app.student_profile_id?.toString() || app.student_profile_id);
+                
+                if (profileId) {
+                    try {
+                        const fetchedProfile = await StudentProfile.findById(profileId).select('first_name last_name university major year_of_study').lean();
+                        if (fetchedProfile) {
+                            studentProfile = fetchedProfile;
+                        }
+                    } catch (err) {
+                        console.error('Error fetching student profile:', err);
+                        studentProfile = null;
+                    }
+                }
+            }
+            
+            // Extract and normalize names - only apply defaults if truly missing
+            let finalFirstName = studentProfile?.first_name;
+            let finalLastName = studentProfile?.last_name;
+            
+            // Convert to string and trim, but preserve the original value if it exists
+            if (finalFirstName !== null && finalFirstName !== undefined) {
+                finalFirstName = finalFirstName.toString().trim();
+            }
+            if (finalLastName !== null && finalLastName !== undefined) {
+                finalLastName = finalLastName.toString().trim();
+            }
+            
+            // Only apply defaults if names are truly empty or missing
+            if (!finalFirstName || finalFirstName === '') {
+                finalFirstName = 'Student';
+            }
+            // Don't set last_name to 'User' - use empty string or first name if needed
+            if (!finalLastName || finalLastName === '' || finalLastName === 'User') {
+                finalLastName = '';
+            }
+            
+            // Build the final student profile object
+            studentProfile = {
+                first_name: finalFirstName,
+                last_name: finalLastName,
+                university: studentProfile?.university || null,
+                major: studentProfile?.major || null,
+                year_of_study: studentProfile?.year_of_study || null
+            };
+            
+            obj.student_profile_id = studentProfile;
+            return obj;
+        }));
         
         res.json(applications);
     } catch (error) {

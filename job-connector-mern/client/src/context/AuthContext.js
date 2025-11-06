@@ -33,6 +33,7 @@ export const AuthProvider = ({ children }) => {
                 email: response.email,
                 role: response.role,
                 isProfileComplete: response.isProfileComplete,
+                name: response.name || 'User',
             };
             authService.storeAuthData(userData, response.token);
             setUser(userData);
@@ -55,6 +56,7 @@ export const AuthProvider = ({ children }) => {
                 email: response.email,
                 role: response.role,
                 isProfileComplete: response.isProfileComplete,
+                name: response.name || name || 'User',
             };
             authService.storeAuthData(userData, response.token);
             setUser(userData);
