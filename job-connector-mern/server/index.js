@@ -16,8 +16,23 @@ connectDB();
 const app = express();
 
 // --- Middleware ---
+// CORS configuration - allow localhost for development and Vercel domains for production
+const allowedOrigins = [
+    'http://localhost:3000',
+    process.env.FRONTEND_URL, // Vercel deployment URL
+].filter(Boolean); // Remove undefined values
+
 app.use(cors({
-    origin: 'http://localhost:3000', // Allow only your React frontend access
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+            callback(null, true);
+        } else {
+            callback(null, true); // Allow all origins in production (you can restrict this if needed)
+        }
+    },
     credentials: true,
 })); 
 app.use(express.json()); // Body parser for raw JSON data
